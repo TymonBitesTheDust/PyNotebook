@@ -210,6 +210,14 @@ async function handle(m) {
       const res = kernelMod.complete(m.code, m.pos);
       return JSON.parse(res);
     }
+    case "lint": {
+      const ctx = m.context && m.context.length ? pyodide.toPy(m.context) : null;
+      try {
+        return JSON.parse(kernelMod.lint(m.code, ctx));
+      } finally {
+        if (ctx) ctx.destroy();
+      }
+    }
     case "loadPackages": {
       await platform.loadPackages(m.names);
       return true;

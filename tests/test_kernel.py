@@ -171,5 +171,61 @@ _nbkernel._kernel.ns["os"] = os
 c = json.loads(_nbkernel.complete("os.pa", 5))
 check(any(o["label"] == "path" for o in c["options"]) and c["from"] == 3, "attribute completion", c)
 
+# lint (mistakes shown while typing)
+def lint(code, context=None):
+    return json.loads(_nbkernel.lint(code, context))
+
+L = lint('print("hi"')
+check(len(L) == 1 and L[0]["severity"] == "error" and "never closed" in L[0]["message"] and (L[0]["line"], L[0]["col"]) == (1, 5),
+      "lint: unclosed bracket", L)
+L = lint("x = 1\nif x > 0\n    print(x)")
+check(L and L[0]["line"] == 2 and "expected ':'" in L[0]["message"], "lint: missing colon", L)
+L = lint("s = 'abc")
+check(L and "unterminated string" in L[0]["message"], "lint: unterminated string", L)
+L = lint("for i in range(3):\nprint(i)")
+check(L and L[0]["line"] == 2 and "indent" in L[0]["message"], "lint: missing indentation", L)
+L = lint("def f():\n    return 1\nreturn 2")
+check(L and L[0]["line"] == 3 and "outside function" in L[0]["message"], "lint: compiler-stage errors too", L)
+L = lint("%matplotlib inline\n!ls\nfiles = !ls\nawait asyncio.sleep(0)\nimport asyncio")
+check(L == [], "lint: magics, shell lines and top-level await are fine", L)
+L = lint("%%time\nx = (1,")
+check(L and L[0]["line"] == 2, "lint: %%time cells are checked with the right line", L)
+check(lint("%%html\n<b>not python(</b>") == [], "lint: %%html cells are skipped")
+L = lint("pirnt('hello')")
+check(len(L) == 1 and L[0]["severity"] == "warning" and L[0].get("fix") == "print" and (L[0]["col"], L[0]["endCol"]) == (0, 5),
+      "lint: typo suggests a fix", L)
+L = lint("total = 0\nfor n in [1, 2]:\n    total += n\nprint(totl)")
+check(len(L) == 1 and L[0]["line"] == 4 and L[0].get("fix") == "total", "lint: misspelt variable", L)
+L = lint("y = undefined_thing + 1")
+check(len(L) == 1 and "isn't defined" in L[0]["message"] and "fix" not in L[0], "lint: unknown name without a guess", L)
+check(lint("z = later_value * 2", ["later_value = 5"]) == [], "lint: names from other cells count")
+check(lint("from math import *\nprint(sqrt(2), whatever)") == [], "lint: star imports switch name checks off")
+check(lint("def f(a, *args, b=1, **kw):\n    return a, args, b, kw, [q for q in args], (w := 3), w") == [], "lint: arguments, comprehensions, walrus")
+check(lint("try:\n    pass\nexcept ValueError as err:\n    print(err)\nmatch 1:\n    case [first, *rest]:\n        print(first, rest)") == [], "lint: except-as and match capture names")
+_nbkernel._kernel.ns["os"] = os
+L = lint("os.getcwdd()")
+check(len(L) == 1 and L[0].get("fix") == "getcwd" and (L[0]["col"], L[0]["endCol"]) == (3, 10), "lint: missing module attribute", L)
+check(lint("os.getcwd()") == [], "lint: real module attribute is fine")
+L = lint("path = 'C:\\new\\data'\nre_ = '\\d+'")
+check(any(d["severity"] == "warning" and "escape" in d["message"] for d in L), "lint: invalid escape sequence warning", L)
+L = lint("héllo = 1\nprint(héllo, wörld)")
+check(L and L[0]["col"] == 13 and L[0]["endCol"] == 18, "lint: columns count characters, not bytes", L)
+check(text(run("print('lint is silent')")[1]) == "lint is silent\n", "lint: no stray output in later cells")
+
+import math  # noqa: F401  (loaded, as after running a cell that imports it)
+L = lint("import math\nmath.sqroot(2)")
+check(len(L) == 1 and L[0].get("fix") == "sqrt", "lint: module imported in the same cell is checked", L)
+check(lint("import os.path\nos.not_loaded_yet") == [], "lint: dotted imports aren't second-guessed")
+check(lint("import notinstalled_pkg\nnotinstalled_pkg.anything") == [], "lint: modules not loaded yet aren't checked")
+
+# completions carry signatures and mark the user's names
+c = json.loads(_nbkernel.complete("pr", 2))
+labels = [o["label"] for o in c["options"]]
+check("print" in labels and any(o["label"] == "print" and o["detail"].startswith("(") for o in c["options"]), "completion: print with its signature", c)
+_nbkernel._kernel.ns["price"] = 3
+c = json.loads(_nbkernel.complete("pr", 2))
+check(any(o["label"] == "price" and o["user"] for o in c["options"]) and not any(o["label"] == "print" and o["user"] for o in c["options"]),
+      "completion: user's names are marked", c)
+
 real_stdout.write(f"\n{len(failures)} failure(s)\n")
 sys.exit(1 if failures else 0)

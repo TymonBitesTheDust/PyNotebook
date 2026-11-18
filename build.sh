@@ -5,8 +5,8 @@ cd "$(dirname "$0")"
 ROOT=$PWD
 TC=${TOOLCHAIN:-$HOME/toolchain}          # android.jar, aapt2, dx.jar, apksigner.jar
 PYODIDE=${PYODIDE_DIR:-$HOME/vendor/pyodide/package}
-VERSION_NAME=${VERSION_NAME:-1.3.0}
-VERSION_CODE=${VERSION_CODE:-3}
+VERSION_NAME=${VERSION_NAME:-1.4.0}
+VERSION_CODE=${VERSION_CODE:-4}
 MIN_SDK=24
 TARGET_SDK=35
 OUT=$ROOT/build

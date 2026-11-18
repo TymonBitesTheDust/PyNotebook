@@ -219,6 +219,20 @@ export class Kernel {
     }
   }
 
+  // Mistakes in a piece of code, checked by Python itself. null when Python isn't
+  // ready (the editor then uses its own quick check). context: other cells' code.
+  async lint(code, context) {
+    if (this.state !== "idle") return null;
+    const req = this._request({ cmd: "lint", code, context: context || [] });
+    req.catch(() => {});
+    const timeout = new Promise((r) => setTimeout(() => r(null), 1500));
+    try {
+      return await Promise.race([req, timeout]);
+    } catch {
+      return null;
+    }
+  }
+
   async loadPackages(names, onOutput) {
     const handlers = { onOutput };
     await this.start();

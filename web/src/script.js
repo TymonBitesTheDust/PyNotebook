@@ -4,6 +4,8 @@
 
 import { el, icon, iconButton, actionSheet, toast, dialog, debounce } from "./ui.js";
 import { createEditor, applyRemoteChanges } from "./editor.js";
+import { recheck } from "./assist.js";
+import { settings } from "./settings.js";
 import { applyMessage, wireLinks } from "./outputs.js";
 import { OutputArea, Emitter, bump, saveErrorText, kernelChip, kernelMenu, interruptOrRestart, openFilesPanel, showStatus, showStdin } from "./common.js";
 import { Kernel } from "./kernel.js";
@@ -26,6 +28,14 @@ export class ScriptDoc extends Emitter {
     this.stdin = null;
     this.kernel = new Kernel({ onState: (s, t) => this.emit("kernel", { state: s, text: t }) });
     this.saveDraftSoon = debounce(() => this.app.saveDraft(this), 1500);
+  }
+
+  // Start Python in the background once you work on the script, so mistakes can be
+  // checked properly (same rule as notebooks: only when nothing else has started it).
+  warmUp() {
+    if (this.kernel.state !== "off" || !settings.autoStart || settings.checkCode === false) return;
+    if (this.app.anyKernelStarted()) return;
+    this.kernel.start().catch(() => {});
   }
 
   // A view changed the text; copy the change into the other views.
@@ -227,9 +237,11 @@ export class ScriptView {
       onUpdate: (u, remote) => {
         if (!remote) doc.edited(u.changes, u.state.doc.toString(), this);
       },
+      onFocus: () => doc.warmUp(),
       onRun: () => doc.run(),
       onRunInPlace: () => doc.run(),
       complete: (code, pos) => doc.kernel.complete(code, pos),
+      lint: (code) => doc.kernel.lint(code),
     });
     this.area = new OutputArea(this.outEl);
   }
@@ -250,6 +262,7 @@ export class ScriptView {
     on("kernel", ({ state, text }) => {
       this.chipUpdate(state, text);
       this.stopBtn.classList.toggle("hide", state !== "busy");
+      if (state === "idle") recheck(this.editor);
     });
     on("run-start", () => {
       this.editor.contentDOM.blur();

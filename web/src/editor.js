@@ -4,12 +4,13 @@ import { EditorView, keymap, drawSelection, highlightSpecialChars, lineNumbers, 
 import { EditorState, Compartment, Annotation, Transaction } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentWithTab, indentLess, indentMore } from "@codemirror/commands";
 import { indentOnInput, bracketMatching, syntaxHighlighting, indentUnit } from "@codemirror/language";
-import { closeBrackets, closeBracketsKeymap, autocompletion, completionKeymap, completeAnyWord } from "@codemirror/autocomplete";
+import { closeBrackets, closeBracketsKeymap, autocompletion, completionKeymap } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { python, pythonLanguage } from "@codemirror/lang-python";
 import { markdown } from "@codemirror/lang-markdown";
 import { tags as t, tagHighlighter, highlightCode } from "@lezer/highlight";
 import { settings } from "./settings.js";
+import { pythonCompletions, acceptSuggestion, pythonMistakes } from "./assist.js";
 
 export const highlighter = tagHighlighter([
   { tag: t.keyword, class: "tk-kw" },
@@ -80,26 +81,21 @@ export function applyRemoteChanges(view, changes) {
   view.dispatch({ changes, annotations: [remoteEdit.of(true), Transaction.addToHistory.of(false)] });
 }
 
-export function createEditor(parent, { doc, lang = "python", onChange, onUpdate, onRun, onRunInPlace, onEscape, onFocus, onBlur, complete, placeholder }) {
+// complete(code, pos) and lint(code) ask the running Python; both may answer null.
+export function createEditor(parent, { doc, lang = "python", onChange, onUpdate, onRun, onRunInPlace, onEscape, onFocus, onBlur, complete, lint, words, placeholder }) {
   const runKeys = [
     { key: "Shift-Enter", run: () => { onRun && onRun(); return true; } },
     { key: "Mod-Enter", run: () => { onRunInPlace && onRunInPlace(); return true; } },
     { key: "Escape", run: () => { onEscape && onEscape(); return true; } },
   ];
+  const pySource = pythonCompletions(complete, words);
   const completionSource = async (ctx) => {
     if (lang !== "python") return null;
     if (ctx.view && !ctx.view.hasFocus) return null;
-    const word = ctx.matchBefore(/[\w.]+/);
-    if (!word || (word.from === word.to && !ctx.explicit)) return null;
-    if (complete) {
-      const res = await complete(ctx.state.doc.toString(), ctx.pos);
-      // The answer may arrive after the person moved on (blur, another pane).
-      if (ctx.aborted || (ctx.view && !ctx.view.hasFocus)) return null;
-      if (res && res.options && res.options.length) {
-        return { from: res.from, options: res.options, validFor: /^\w*$/ };
-      }
-    }
-    return completeAnyWord(ctx);
+    const res = await pySource(ctx);
+    // The answer may arrive after the person moved on (blur, another pane).
+    if (ctx.aborted || (ctx.view && !ctx.view.hasFocus)) return null;
+    return res;
   };
   const extensions = [
     highlightSpecialChars(),
@@ -112,8 +108,11 @@ export function createEditor(parent, { doc, lang = "python", onChange, onUpdate,
     closeBrackets(),
     highlightSelectionMatches(),
     syntaxHighlighting(highlighter),
-    autocompletion({ override: [completionSource], activateOnTyping: true, icons: false }),
-    keymap.of([...runKeys, ...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...completionKeymap, indentWithTab]),
+    // Nothing is pre-selected, so Enter still starts a new line; Tab or a tap inserts a suggestion.
+    autocompletion({ override: [completionSource], activateOnTyping: true, icons: true, selectOnOpen: false, maxRenderedOptions: 50, interactionDelay: 0 }),
+    keymap.of([...runKeys, ...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...completionKeymap,
+      { key: "Tab", run: acceptSuggestion }, indentWithTab]),
+    lang === "python" ? pythonMistakes(lint) : [],
     lang === "python" ? python() : lang === "markdown" ? markdown() : [],
     wrapComp.of(settings.wrap ? EditorView.lineWrapping : []),
     numbersComp.of(settings.lineNumbers && lang === "python" ? lineNumbers() : []),
@@ -153,6 +152,12 @@ export function moveCursor(view, delta) {
 
 export function indent(view, more) {
   (more ? indentMore : indentLess)(view);
+  view.focus();
+}
+
+// The ⇥ key above the phone keyboard: insert the suggestion if one is showing, else indent.
+export function tabKey(view) {
+  if (!acceptSuggestion(view)) indentMore(view);
   view.focus();
 }
 

@@ -3,7 +3,7 @@
 import { el, icon, actionSheet, confirmDialog, toast, panel, formatBytes, promptDialog } from "./ui.js";
 import { applyMessage, renderOutput } from "./outputs.js";
 import { bridge } from "./bridge.js";
-import { createEditor, insertText, moveCursor, indent } from "./editor.js";
+import { createEditor, insertText, moveCursor, indent, tabKey } from "./editor.js";
 
 // ------------------------------------------------------------ output area with node reuse
 
@@ -196,7 +196,7 @@ export function kernelMenu(kernel, { onRestartRunAll } = {}) {
 // ------------------------------------------------------------ symbol bar shown above the keyboard
 
 const KEYS = [
-  { label: "⇥", title: "Indent", act: (v) => indent(v, true) },
+  { label: "⇥", title: "Indent or insert suggestion", act: (v) => tabKey(v) },
   { label: "⇤", title: "Dedent", act: (v) => indent(v, false) },
   { label: "( )", ins: "()", off: 1 },
   { label: "[ ]", ins: "[]", off: 1 },

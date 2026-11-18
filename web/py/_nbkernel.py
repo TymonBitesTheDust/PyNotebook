@@ -1281,11 +1281,21 @@ def _emulate(cmd, out, kernel):
 # completion
 
 
-_KEYWORDS = None
+def _signature(obj):
+    """Short call signature for the completion list, or ''."""
+    try:
+        sig = str(inspect.signature(obj))
+    except (TypeError, ValueError):
+        return ""
+    return sig if len(sig) <= 60 else sig[:57] + "\u2026)"
 
 
 def complete(code, pos):
-    """Return JSON {from, options} for the text before ``pos``."""
+    """Return JSON {from, options} for the text before ``pos``.
+
+    Each option has label and type; callables also get ``detail`` (their signature)
+    when the list is short, and names the user created are marked ``user``.
+    """
     import keyword
     before = code[:pos]
     m = re.search(r"([A-Za-z_][\w]*(?:\.[A-Za-z_]\w*)*\.?)$", before)
@@ -1305,31 +1315,217 @@ def complete(code, pos):
             names = dir(obj)
         except Exception:
             names = []
+        picked = [n for n in names if n.startswith(partial) and (partial.startswith("_") or not n.startswith("_"))]
         opts = []
-        for nme in names:
-            if nme.startswith(partial) and (partial.startswith("_") or not nme.startswith("_")):
-                kind = "property"
-                try:
-                    a = getattr(obj, nme)
-                    kind = "class" if inspect.isclass(a) else ("method" if callable(a) else
-                                                              ("namespace" if isinstance(a, types.ModuleType) else "property"))
-                except Exception:
-                    pass
-                opts.append({"label": nme, "type": kind})
-        return json.dumps({"from": pos - len(partial), "options": opts[:300]})
+        for nme in picked[:300]:
+            kind, detail = "property", ""
+            try:
+                a = getattr(obj, nme)
+                kind = "class" if inspect.isclass(a) else ("method" if callable(a) else
+                                                          ("namespace" if isinstance(a, types.ModuleType) else "property"))
+                if kind == "method" and len(picked) <= 80:
+                    detail = _signature(a)
+            except Exception:
+                pass
+            opts.append({"label": nme, "type": kind, "detail": detail})
+        return json.dumps({"from": pos - len(partial), "options": opts})
     partial = token
     names = set(ns) | set(dir(builtins)) | set(keyword.kwlist)
+    picked = [n for n in sorted(names) if n.startswith(partial) and not n.startswith("__nb")
+              and (partial.startswith("_") or not n.startswith("_"))]
     opts = []
-    for nme in sorted(names):
-        if nme.startswith(partial) and not nme.startswith("__nb") and (partial.startswith("_") or not nme.startswith("_")):
-            if nme in keyword.kwlist:
-                kind = "keyword"
+    for nme in picked[:300]:
+        detail, user = "", False
+        if nme in keyword.kwlist:
+            kind = "keyword"
+        else:
+            user = nme in ns and nme not in getattr(_kernel, "_hidden", ())
+            v = ns.get(nme, getattr(builtins, nme, None))
+            kind = ("class" if inspect.isclass(v) else "function" if callable(v) else
+                    "namespace" if isinstance(v, types.ModuleType) else "variable")
+            if kind == "function" and len(picked) <= 80:
+                detail = _signature(v)
+        opts.append({"label": nme, "type": kind, "detail": detail, "user": user})
+    return json.dumps({"from": pos - len(partial), "options": opts})
+
+
+# --------------------------------------------------------------------------
+# lint: mistakes shown while typing
+
+
+_IGNORE_NAME = re.compile(r"^(_+\d*|_i+\d*|_ih|_oh|_dh)$")
+_ALWAYS_KNOWN = {"__file__", "__name__", "__builtins__", "__doc__", "display", "get_ipython", "In", "Out", "exit", "quit"}
+_ctx_cache = {}
+
+
+def _lint_source(code):
+    """(python_source, line_offset), or (None, 0) for a cell that isn't Python (e.g. %%html)."""
+    stripped = code.lstrip("\n")
+    if stripped.startswith("%%"):
+        lead = code[:len(code) - len(stripped)].count("\n")
+        first, _, rest = stripped.partition("\n")
+        name = first[2:].split(" ")[0].strip()
+        if name in ("time", "capture", "python", "python3", "prun"):
+            return transform_cell(rest), lead + 1
+        return None, 0
+    return transform_cell(code), 0
+
+
+def _bound_names(tree):
+    """Every name a piece of code binds (in any scope), and whether it star-imports."""
+    names, star = set(), False
+    type_params = tuple(getattr(ast, n) for n in ("TypeVar", "ParamSpec", "TypeVarTuple") if hasattr(ast, n))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            names.add(node.id)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.arg):
+            names.add(node.arg)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for a in node.names:
+                if a.name == "*":
+                    star = True
+                else:
+                    names.add(a.asname or a.name.split(".")[0])
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            names.add(node.name)
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            names.update(node.names)
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
+            names.add(node.name)
+        elif isinstance(node, ast.MatchMapping) and node.rest:
+            names.add(node.rest)
+        elif type_params and isinstance(node, type_params):
+            names.add(node.name)
+    return names, star
+
+
+def _context_names(sources):
+    """Names bound by the notebook's other cells (cached per cell source)."""
+    names, star = set(), False
+    for src in sources or ():
+        key = hash(src)
+        hit = _ctx_cache.get(key)
+        if hit is None:
+            try:
+                py, _ = _lint_source(src)
+                hit = _bound_names(ast.parse(py)) if py else (set(), False)
+            except Exception:
+                hit = (set(), False)
+            if len(_ctx_cache) > 3000:
+                _ctx_cache.clear()
+            _ctx_cache[key] = hit
+        names |= hit[0]
+        star = star or hit[1]
+    return names, star
+
+
+def _char_col(lines, lineno, byte_col):
+    """AST columns count UTF-8 bytes; the editor counts characters."""
+    if 1 <= lineno <= len(lines):
+        return len(lines[lineno - 1].encode("utf-8")[:byte_col].decode("utf-8", "replace"))
+    return byte_col
+
+
+def _suggest(name, candidates):
+    import difflib
+    pool = [c for c in candidates if not c.startswith("_")]
+    m = difflib.get_close_matches(name, pool, n=1, cutoff=0.75)
+    return m[0] if m else None
+
+
+def lint(code, context=None):
+    """JSON list of problems in ``code``: syntax errors (exactly as Python reports them)
+    and names that aren't defined anywhere (in this cell, other cells or the running session).
+
+    Each item: {line, col, endLine, endCol, severity: error|warning, message, fix?}
+    (lines 1-based, columns 0-based characters, fix = replacement text for the range).
+    """
+    import warnings
+    src, offset = _lint_source(code)
+    if src is None or not src.strip():
+        return "[]"
+    lines = src.split("\n")
+    out = []
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        try:
+            compile(src, "<cell>", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT, dont_inherit=True)
+            tree = ast.parse(src, "<cell>")
+        except SyntaxError as e:
+            line = e.lineno or 1
+            col = max(0, (e.offset or 1) - 1)
+            end_line = e.end_lineno or line
+            end_col = (e.end_offset - 1) if e.end_offset and e.end_offset > 0 else col + 1
+            out.append({"line": line + offset, "col": col, "endLine": end_line + offset, "endCol": end_col,
+                        "severity": "error", "message": e.msg})
+            return json.dumps(out)
+        except (ValueError, OverflowError, RecursionError, MemoryError) as e:
+            out.append({"line": 1 + offset, "col": 0, "endLine": 1 + offset, "endCol": 1, "severity": "error", "message": str(e)})
+            return json.dumps(out)
+    for w in caught:
+        if issubclass(w.category, SyntaxWarning) and w.lineno:
+            ln = w.lineno
+            width = len(lines[ln - 1]) if 0 < ln <= len(lines) else 1
+            out.append({"line": ln + offset, "col": 0, "endLine": ln + offset, "endCol": width,
+                        "severity": "warning", "message": str(w.message)})
+
+    ns = _kernel.ns if _kernel is not None else {}
+    bound, star = _bound_names(tree)
+    # How this cell binds module names: "import a as m" / "import a" (checkable once a is
+    # loaded) versus "import a.b" (binds "a", whose attributes may only appear on import).
+    plain_imports, dotted = {}, set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                if a.asname or "." not in a.name:
+                    plain_imports[a.asname or a.name] = a.name
+                else:
+                    dotted.add(a.name.split(".")[0])
+    ctx_names, ctx_star = _context_names(context)
+    if star or ctx_star:
+        return json.dumps(out)
+    known = bound | ctx_names | set(ns) | set(dir(builtins)) | _ALWAYS_KNOWN
+    flagged = 0
+    for node in ast.walk(tree):
+        if flagged >= 20:
+            break
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            name = node.id
+            if name in known or _IGNORE_NAME.match(name):
+                continue
+            fix = _suggest(name, known)
+            msg = f"'{name}' isn't defined" + (f". Did you mean '{fix}'?" if fix else "")
+            item = {"line": node.lineno + offset, "col": _char_col(lines, node.lineno, node.col_offset),
+                    "endLine": node.end_lineno + offset, "endCol": _char_col(lines, node.end_lineno, node.end_col_offset),
+                    "severity": "warning", "message": msg}
+            if fix:
+                item["fix"] = fix
+            out.append(item)
+            flagged += 1
+        elif isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Load) and isinstance(node.value, ast.Name):
+            base = node.value.id
+            if base in dotted:
+                continue
+            if base in bound:
+                mod = sys.modules.get(plain_imports.get(base, ""))
             else:
-                v = ns.get(nme, getattr(builtins, nme, None))
-                kind = ("class" if inspect.isclass(v) else "function" if callable(v) else
-                        "namespace" if isinstance(v, types.ModuleType) else "variable")
-            opts.append({"label": nme, "type": kind})
-    return json.dumps({"from": pos - len(partial), "options": opts[:300]})
+                mod = ns.get(base)
+            if not isinstance(mod, types.ModuleType) or "__getattr__" in vars(mod):
+                continue
+            if hasattr(mod, node.attr):
+                continue
+            fix = _suggest(node.attr, dir(mod))
+            msg = f"module '{mod.__name__}' has no attribute '{node.attr}'" + (f". Did you mean '{fix}'?" if fix else "")
+            end = _char_col(lines, node.end_lineno, node.end_col_offset)
+            item = {"line": node.end_lineno + offset, "col": max(0, end - len(node.attr)), "endLine": node.end_lineno + offset,
+                    "endCol": end, "severity": "warning", "message": msg}
+            if fix:
+                item["fix"] = fix
+            out.append(item)
+            flagged += 1
+    return json.dumps(out)
 
 
 # --------------------------------------------------------------------------

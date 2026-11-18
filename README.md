@@ -64,6 +64,18 @@ How the exe behaves:
 - Autocomplete from the live Python session.
 - A symbol bar above the keyboard with Tab, brackets, `:`, `=`, quotes, cursor keys and Run.
 
+**Typing help** (notebook cells, the console and scripts)
+
+- **Suggestions while typing:** type a few letters and matching names appear. For example, "pr" offers `print` and shows how to call it.
+  - Tap a suggestion, or press Tab (⇥ on the phone's symbol bar), to insert it. Functions come with `()` and the cursor inside.
+  - Nothing is pre-selected, so Enter still starts a new line.
+  - Suggestions cover Python's keywords and built-ins (even before Python has started), names from your running code and other cells, attributes after a dot (`math.fl` → `floor`), and module names after `import`.
+- **Mistakes marked while typing:** the line with a problem gets a coloured edge, the exact spot is underlined, and a bar under the code says what's wrong. Tap the bar to jump to the problem.
+  - Red marks syntax errors, in Python's own words: `'(' was never closed`, `expected ':'`, `unterminated string literal`, `expected an indented block…`, `Perhaps you forgot a comma?`
+  - Amber marks names that aren't defined anywhere in the notebook or the running session, and misspelt module functions. When there's a likely fix, a **Change to …** button applies it (`pirnt` → `print`, `math.sqroot` → `math.sqrt`).
+  - Before Python is ready, a quick built-in check still catches missing brackets, quotes and colons.
+- Both can be switched off in Settings.
+
 **Split screen**
 
 Tap the split button (two columns) in a file's top bar, or use ⋯ → Split screen. The screen can show 2–4 panes. Each pane holds one of:

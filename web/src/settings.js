@@ -10,6 +10,8 @@ const defaults = {
   autoStart: true,
   splitDirection: "auto", // auto | rows | cols
   accent: "teal", // theme colour, see themes.js
+  suggest: true, // suggestions while typing
+  checkCode: true, // mark mistakes while typing
 };
 
 function load() {

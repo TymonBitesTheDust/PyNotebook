@@ -4,6 +4,7 @@
 
 import { el, icon, iconButton, actionSheet, toast, confirmDialog, dialog, promptDialog, panel, debounce } from "./ui.js";
 import { createEditor, highlightCodeHtml, applyEditorSettings } from "./editor.js";
+import { recheck } from "./assist.js";
 import { renderMarkdown, headingsOf } from "./markdown.js";
 import { applyMessage, wireLinks, slug } from "./outputs.js";
 import { OutputArea, Emitter, bump, saveErrorText, kernelChip, kernelMenu, interruptOrRestart, openFilesPanel, showStatus, showStdin } from "./common.js";
@@ -608,6 +609,8 @@ export class NotebookView {
     on("kernel", ({ state, text }) => {
       this.chipUpdate(state, text);
       this.stopBtn.classList.toggle("hide", state !== "busy");
+      // Python can now check the code properly (and knows names from cells just run).
+      if (state === "idle" && this.editor) recheck(this.editor);
     });
     on("follow", ({ cell, view }) => {
       if (view !== this) return;
@@ -712,6 +715,8 @@ export class NotebookView {
       onRunInPlace: () => this.runSelected(false),
       onEscape: () => this._stopEditing(),
       complete: (code, pos) => this.doc.kernel.complete(code, pos),
+      lint: lang === "python" ? (code) => this.doc.kernel.lint(code, this._otherCode(cell)) : null,
+      words: () => this._otherWords(cell),
     });
     // Focus now so typing lands in the cell at once; place the caret where the
     // person tapped once the editor has been laid out.
@@ -724,6 +729,32 @@ export class NotebookView {
         if (p != null) this.editor.dispatch({ selection: { anchor: p } });
       });
     }
+  }
+
+  // Other code cells, so the mistake check knows the names they define.
+  _otherCode(cell) {
+    const out = [];
+    let size = 0;
+    for (const c of this.doc.cells) {
+      if (c.type !== "code" || c.id === cell.id || !c.source.trim()) continue;
+      size += c.source.length;
+      if (size > 400000) break;
+      out.push(c.source);
+    }
+    return out;
+  }
+
+  // Names used in the other code cells, for suggestions.
+  _otherWords(cell) {
+    const words = new Set();
+    const re = /[A-Za-z_][A-Za-z0-9_]{2,}/g;
+    for (const src of this._otherCode(cell)) {
+      for (const m of src.matchAll(re)) {
+        words.add(m[0]);
+        if (words.size >= 2000) return words;
+      }
+    }
+    return words;
   }
 
   _dropEditor() {

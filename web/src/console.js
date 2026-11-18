@@ -3,6 +3,7 @@
 
 import { el, iconButton, actionSheet, toast } from "./ui.js";
 import { createEditor, highlightCodeHtml } from "./editor.js";
+import { recheck } from "./assist.js";
 import { wireLinks } from "./outputs.js";
 import { OutputArea, Emitter, execInto, kernelChip, kernelMenu, interruptOrRestart, openFilesPanel, showStatus } from "./common.js";
 import { Kernel } from "./kernel.js";
@@ -69,7 +70,10 @@ export class ConsoleView {
     this.offs.push(doc.on("kernel", ({ state, text }) => {
       this.chipUpdate(state, text);
       this.stopBtn.classList.toggle("hide", state !== "busy");
-      if (state === "idle") this._banner();
+      if (state === "idle") {
+        this._banner();
+        recheck(this.editor);
+      }
     }));
     this.offs.push(doc.on("name", () => {
       this.titleEl.textContent = doc.name;
@@ -121,6 +125,7 @@ export class ConsoleView {
       onRun: () => this.run(),
       onRunInPlace: () => this.run(),
       complete: (code, pos) => this.doc.kernel.complete(code, pos),
+      lint: (code) => this.doc.kernel.lint(code),
     });
   }
 
