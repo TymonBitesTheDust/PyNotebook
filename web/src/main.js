@@ -682,9 +682,42 @@ class App {
         item("sparkle", "Built with", "Claude AI"),
         item("southernCross", "Made in", "Proudly made in Australia"),
         item("globe", "Website", link(APP_LINKS.website, "tymon.website")),
-        item("code", "Source code", link(APP_LINKS.source, "github.com/TymonBitesTheDust/PyNotebook"))),
-      el("p", { class: "about-copy" }, "\u00a9 2026 Tymon Ng"),
+        item("code", "Source code", link(APP_LINKS.source, "github.com/TymonBitesTheDust/PyNotebook")),
+        item("licence", "Licence", el("button", { class: "about-v about-link about-btn", type: "button", onclick: () => this.openLicences() }, "MIT \u00b7 Open-source licences"))),
+      el("p", { class: "about-copy" }, "\u00a9 2026 Tymon Ng. Free software under the MIT licence."),
       credits);
+  }
+
+  // Open-source licences, written by the build (web/licences.mjs) from what is actually bundled.
+  openLicences() {
+    const list = el("div", { class: "lic-list" }, el("p", { class: "lic-note" }, "Loading\u2026"));
+    const openLink = (href, text) => {
+      const a = el("a", { class: "lic-link", href, target: "_blank", rel: "noopener" }, text);
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.bridge.openUrl(href);
+      });
+      return a;
+    };
+    const entry = (title, sub, body) => el("details", { class: "lic-item" },
+      el("summary", null, el("span", { class: "lic-title" }, title), el("span", { class: "lic-sub" }, sub)),
+      body);
+    panel("Open-source licences", el("div", null,
+      el("p", { class: "lic-intro" }, "PyNotebook is free software under the MIT licence. It includes the open-source software below, each used under its own licence."),
+      list,
+      el("p", { class: "lic-note" }, "Python packages you import later, such as numpy or pandas, are downloaded from the Pyodide project and come with their own licences.")));
+    assetJSON("licenses.json").then((n) => {
+      list.replaceChildren(
+        entry(n.app.name, n.app.license, el("pre", { class: "lic-text" }, n.app.text)),
+        ...n.groups.map((g) => entry(g.title, [g.license, g.packages.length === 1 ? g.packages[0].version : ""].filter(Boolean).join(" \u00b7 "),
+          el("div", null,
+            el("ul", { class: "lic-pkgs" }, ...g.packages.map((p) => el("li", null,
+              p.url ? openLink(p.url, p.name) : p.name, p.version ? el("span", { class: "lic-ver" }, " " + p.version) : null))),
+            g.note ? el("p", { class: "lic-pnote" }, g.note) : null,
+            el("pre", { class: "lic-text" }, g.text)))));
+    }).catch((e) => {
+      list.replaceChildren(el("p", { class: "lic-note" }, "Couldn't load the licences: " + (e.message || e)));
+    });
   }
 }
 
