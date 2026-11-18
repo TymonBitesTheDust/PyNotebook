@@ -1,0 +1,18 @@
+# Dependencies and build outputs (recreated by build.sh and windows/build.sh)
+node_modules/
+web/dist/
+web/dist-single/
+web/src/vendor/
+build/
+build-win/
+windows/assets/
+windows/*.syso
+windows/versioninfo.json
+__pycache__/
+*.pyc
+tests/shots*/
+
+# The Android signing key is private: keep your own copy and never publish it.
+android/keys/
+*.keystore
+*.jks

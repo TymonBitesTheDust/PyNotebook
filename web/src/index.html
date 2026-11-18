@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#F3F6F5">
+<meta name="color-scheme" content="light dark">
+<title>PyNotebook</title>
+<link rel="icon" href="icon.png">
+<script>
+  // Capture the Android host's message port as early as possible.
+  addEventListener("message", function (e) {
+    if (e.data === "pynotebook:port" && e.ports && e.ports[0]) window.__hostPort = e.ports[0];
+  });
+</script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app"><div class="boot">Loading…</div></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
