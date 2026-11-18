@@ -4,6 +4,17 @@ import { el, icon, actionSheet, confirmDialog, toast, panel, formatBytes, prompt
 import { applyMessage, renderOutput } from "./outputs.js";
 import { bridge } from "./bridge.js";
 import { createEditor, insertText, moveCursor, indent, tabKey } from "./editor.js";
+import { settings, saveSettings } from "./settings.js";
+
+// ------------------------------------------------------------ line numbers (one setting for every file)
+
+export function toggleLineNumbers() {
+  saveSettings({ lineNumbers: !settings.lineNumbers });
+}
+
+export function lineNumbersItem() {
+  return { icon: "numbers", label: settings.lineNumbers ? "Hide line numbers" : "Show line numbers", onClick: toggleLineNumbers };
+}
 
 // ------------------------------------------------------------ output area with node reuse
 

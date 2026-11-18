@@ -248,6 +248,34 @@ button.appbar-title {
   min-height: calc(var(--code-size) * 1.55 + 16px);
 }
 .code-static.wrap { white-space: pre-wrap; word-break: break-word; }
+/* Numbered lines: the same gutter as the editor (numbers at 0.85em, 6px/8px padding),
+   with a hanging indent so wrapped lines start under the code, not under the number. */
+.code-static.numbered { padding-left: 0; }
+.code-static .cl {
+  display: block;
+  min-height: calc(var(--code-size) * 1.55);
+  padding-left: calc(var(--digits) * 0.85ch + 24px);
+  text-indent: calc(var(--digits) * -0.85ch - 24px);
+}
+.code-static:not(.wrap) .cl { width: max-content; min-width: 100%; box-sizing: border-box; }
+.code-static .cl::before {
+  content: attr(data-n);
+  display: inline-block;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  width: calc(var(--digits) * 1ch + 14px);
+  margin-right: 10px;
+  padding: 0 6px 0 8px;
+  text-indent: 0;
+  text-align: right;
+  font-size: 0.85em;
+  line-height: calc(var(--code-size) * 1.55);
+  vertical-align: top;
+  color: var(--muted);
+  background: var(--code-bg);
+}
 .code-static.raw { background: transparent; border: 1px dashed var(--line); }
 .cell.code .cm-editor, .cell.raw .cm-editor { padding: 0; }
 .cell.editing .cell-input { border-radius: 9px; box-shadow: 0 0 0 2px var(--accent); }
@@ -332,7 +360,10 @@ button.appbar-title {
 .cm-selectionMatch { background: color-mix(in srgb, var(--run) 18%, transparent) !important; }
 .cm-placeholder { color: var(--muted) !important; font-style: italic; }
 .cm-gutters { background: transparent !important; border: 0 !important; color: var(--muted) !important; }
-.cm-lineNumbers .cm-gutterElement { padding: 0 6px 0 8px !important; font-size: 0.85em; }
+.cm-lineNumbers .cm-gutterElement { padding: 0 6px 0 8px !important; min-width: 0 !important; font-size: 0.85em; line-height: calc(var(--code-size) * 1.55); }
+/* Code scrolling sideways passes under the numbers, so they need the editor's own background. */
+.cell .cm-gutters { background: var(--code-bg) !important; border-radius: 8px 0 0 8px; }
+.script-editor .cm-gutters { background: var(--surface) !important; }
 .cm-tooltip {
   background: var(--surface) !important;
   border: 1px solid var(--line) !important;

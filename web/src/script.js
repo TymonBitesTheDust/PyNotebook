@@ -3,11 +3,11 @@
 // so you can look at different parts of a long file at once.
 
 import { el, icon, iconButton, actionSheet, toast, dialog, debounce } from "./ui.js";
-import { createEditor, applyRemoteChanges } from "./editor.js";
+import { createEditor, applyRemoteChanges, applyEditorSettings } from "./editor.js";
 import { recheck } from "./assist.js";
-import { settings } from "./settings.js";
+import { settings, onSettings } from "./settings.js";
 import { applyMessage, wireLinks } from "./outputs.js";
-import { OutputArea, Emitter, bump, saveErrorText, kernelChip, kernelMenu, interruptOrRestart, openFilesPanel, showStatus, showStdin } from "./common.js";
+import { OutputArea, Emitter, bump, saveErrorText, kernelChip, kernelMenu, interruptOrRestart, openFilesPanel, showStatus, showStdin, lineNumbersItem } from "./common.js";
 import { Kernel } from "./kernel.js";
 import { pythonToCells } from "./nbformat.js";
 
@@ -243,6 +243,7 @@ export class ScriptView {
       complete: (code, pos) => doc.kernel.complete(code, pos),
       lint: (code) => doc.kernel.lint(code),
     });
+    this.offs.push(onSettings(() => applyEditorSettings(this.editor)));
     this.area = new OutputArea(this.outEl);
   }
 
@@ -317,6 +318,7 @@ export class ScriptView {
       "-",
       ...this.ws.paneMenuItems(this),
       "-",
+      lineNumbersItem(),
       { icon: "notebook", label: "Open as notebook", hint: "# %% markers become cells", onClick: () => this.toNotebook() },
       { icon: "folder", label: "Files", onClick: () => openFilesPanel(d.kernel) },
       { icon: "package", label: "Offline packages", onClick: () => d.app.openPackages(d.kernel) },

@@ -16,7 +16,7 @@ const src = path.join(here, "src");
 const dist = path.join(here, "dist");
 const vendor = path.join(src, "vendor");
 const PYODIDE = process.env.PYODIDE_DIR || path.join(os.homedir(), "vendor", "pyodide", "package");
-const APP_VERSION = process.env.APP_VERSION || "1.4.0";
+const APP_VERSION = process.env.APP_VERSION || "1.5.0";
 const single = process.argv.includes("--single");
 const pyodideVersion = JSON.parse(fs.readFileSync(path.join(PYODIDE, "package.json"), "utf8")).version;
 

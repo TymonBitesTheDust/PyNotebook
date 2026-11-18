@@ -1,6 +1,6 @@
 import os, sys, time
 from playwright.sync_api import sync_playwright
-HTML = os.path.expanduser("~/nbapp/web/dist-single/PyNotebook.html")
+HTML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web", "dist-single", "PyNotebook.html")
 with sync_playwright() as p:
     b = p.chromium.launch()
     page = b.new_page(viewport={"width": 1280, "height": 860})

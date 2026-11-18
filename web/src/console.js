@@ -121,6 +121,7 @@ export class ConsoleView {
     this.editor = createEditor(editorHost, {
       doc: "",
       lang: "python",
+      numbers: false,
       placeholder: "Type Python and tap Run",
       onRun: () => this.run(),
       onRunInPlace: () => this.run(),

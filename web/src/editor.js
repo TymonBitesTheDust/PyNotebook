@@ -71,8 +71,21 @@ export function highlightCodeHtml(code, lang = "python") {
   return html;
 }
 
+// Wraps each line of highlighted HTML in a block that CSS numbers (highlighted
+// spans never cross a line break, so splitting the HTML on "\n" is safe).
+export function numberLines(html) {
+  const lines = html.split("\n");
+  return {
+    html: lines.map((line, i) => `<span class="cl" data-n="${i + 1}">${line}</span>`).join(""),
+    digits: String(lines.length).length,
+  };
+}
+
 const wrapComp = new Compartment();
 const numbersComp = new Compartment();
+// Which editors may show line numbers (Python code, not the console's one-liners).
+const numberable = new WeakMap();
+const numbersFor = (view) => (settings.lineNumbers && numberable.get(view) ? lineNumbers() : []);
 
 // Marks edits copied from another view of the same file (split view), so they aren't echoed back.
 export const remoteEdit = Annotation.define();
@@ -82,7 +95,7 @@ export function applyRemoteChanges(view, changes) {
 }
 
 // complete(code, pos) and lint(code) ask the running Python; both may answer null.
-export function createEditor(parent, { doc, lang = "python", onChange, onUpdate, onRun, onRunInPlace, onEscape, onFocus, onBlur, complete, lint, words, placeholder }) {
+export function createEditor(parent, { doc, lang = "python", numbers = true, onChange, onUpdate, onRun, onRunInPlace, onEscape, onFocus, onBlur, complete, lint, words, placeholder }) {
   const runKeys = [
     { key: "Shift-Enter", run: () => { onRun && onRun(); return true; } },
     { key: "Mod-Enter", run: () => { onRunInPlace && onRunInPlace(); return true; } },
@@ -115,7 +128,7 @@ export function createEditor(parent, { doc, lang = "python", onChange, onUpdate,
     lang === "python" ? pythonMistakes(lint) : [],
     lang === "python" ? python() : lang === "markdown" ? markdown() : [],
     wrapComp.of(settings.wrap ? EditorView.lineWrapping : []),
-    numbersComp.of(settings.lineNumbers && lang === "python" ? lineNumbers() : []),
+    numbersComp.of(settings.lineNumbers && numbers && lang === "python" ? lineNumbers() : []),
     EditorView.contentAttributes.of({ autocorrect: "off", autocapitalize: "off", spellcheck: lang === "markdown" ? "true" : "false", "aria-label": lang === "markdown" ? "Text cell" : "Code" }),
     EditorView.updateListener.of((u) => {
       if (u.docChanged && onUpdate) onUpdate(u, u.transactions.some((tr) => tr.annotation(remoteEdit)));
@@ -128,6 +141,7 @@ export function createEditor(parent, { doc, lang = "python", onChange, onUpdate,
   ];
   if (placeholder) extensions.push(cmPlaceholder(placeholder));
   const view = new EditorView({ state: EditorState.create({ doc, extensions }), parent });
+  numberable.set(view, numbers && lang === "python");
   return view;
 }
 
@@ -165,6 +179,7 @@ export function applyEditorSettings(view) {
   view.dispatch({
     effects: [
       wrapComp.reconfigure(settings.wrap ? EditorView.lineWrapping : []),
+      numbersComp.reconfigure(numbersFor(view)),
     ],
   });
 }

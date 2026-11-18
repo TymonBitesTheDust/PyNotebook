@@ -76,6 +76,13 @@ How the exe behaves:
   - Before Python is ready, a quick built-in check still catches missing brackets, quotes and colons.
 - Both can be switched off in Settings.
 
+**Line numbers** (notebooks and `.py` files)
+
+- Turn them on or off from a file's ⋯ menu (**Show line numbers** / **Hide line numbers**), from Settings → Line numbers, or with `L` on a keyboard. The choice applies to every open file and is remembered.
+- In a notebook each code cell counts from 1, matching Python's error messages ("Cell In[3], line 2"). Numbers show both when reading and when editing, in the same place, so the code doesn't shift when you tap into a cell.
+- Long lines that wrap continue under the code, not under the number. With wrapping off, the numbers stay in view while you scroll sideways.
+- Text and raw cells, and the console's input line, aren't numbered.
+
 **Split screen**
 
 Tap the split button (two columns) in a file's top bar, or use ⋯ → Split screen. The screen can show 2–4 panes. Each pane holds one of:
@@ -100,7 +107,7 @@ Working with panes:
   - `Shift+Enter` and `Ctrl+Enter` run cells.
   - `↑`/`↓` select a cell and `Enter` edits it; `Esc` stops editing.
   - `A`/`B` add a cell above or below; `D D` deletes it.
-  - `M`/`Y`/`R` change the cell type; `I I` interrupts; `O` hides output; `Ctrl+S` saves.
+  - `M`/`Y`/`R` change the cell type; `I I` interrupts; `O` hides output; `L` shows or hides line numbers; `Ctrl+S` saves.
   - The full list is under ⋯ → Keyboard shortcuts.
 - **Opening files:** drop `.ipynb` or `.py` files onto the window to open them. Open file and Save use the Windows file dialogs, and Save writes back to the same file.
 - **Folders:** Files → **Use a folder on this PC** makes that folder Python's working folder, so `open("data.csv")` or `pd.read_csv("data.csv")` read the real file. Files your code writes appear in the folder.

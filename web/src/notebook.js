@@ -3,11 +3,11 @@
 // open at once (split view); they stay in sync through doc events.
 
 import { el, icon, iconButton, actionSheet, toast, confirmDialog, dialog, promptDialog, panel, debounce } from "./ui.js";
-import { createEditor, highlightCodeHtml, applyEditorSettings } from "./editor.js";
+import { createEditor, highlightCodeHtml, numberLines, applyEditorSettings } from "./editor.js";
 import { recheck } from "./assist.js";
 import { renderMarkdown, headingsOf } from "./markdown.js";
 import { applyMessage, wireLinks, slug } from "./outputs.js";
-import { OutputArea, Emitter, bump, saveErrorText, kernelChip, kernelMenu, interruptOrRestart, openFilesPanel, showStatus, showStdin } from "./common.js";
+import { OutputArea, Emitter, bump, saveErrorText, kernelChip, kernelMenu, interruptOrRestart, openFilesPanel, showStatus, showStdin, lineNumbersItem, toggleLineNumbers } from "./common.js";
 import { Kernel } from "./kernel.js";
 import { newCell, serializeNotebook, notebookToPython } from "./nbformat.js";
 import { settings, onSettings } from "./settings.js";
@@ -507,9 +507,18 @@ export class NotebookView {
       for (const h of md.querySelectorAll("h1,h2,h3,h4,h5,h6")) if (!h.id) h.id = slug(h.textContent);
       v.input.append(md);
     } else {
-      const pre = el("pre", { class: "code-static" + (cell.type === "raw" ? " raw" : "") + (settings.wrap ? " wrap" : "") });
-      if (cell.source) pre.innerHTML = cell.type === "code" ? highlightCodeHtml(cell.source) : cell.source.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-      else pre.append(el("span", { class: "placeholder" }, cell.type === "code" ? "Empty code cell" : "Raw cell"));
+      // Code cells count from 1, like the "line 2" in Python's error messages.
+      const numbered = settings.lineNumbers && cell.type === "code" && !!cell.source;
+      const pre = el("pre", { class: "code-static" + (cell.type === "raw" ? " raw" : "") + (settings.wrap ? " wrap" : "") + (numbered ? " numbered" : "") });
+      if (cell.source) {
+        let html = cell.type === "code" ? highlightCodeHtml(cell.source) : cell.source.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+        if (numbered) {
+          const n = numberLines(html);
+          html = n.html;
+          pre.style.setProperty("--digits", n.digits);
+        }
+        pre.innerHTML = html;
+      } else pre.append(el("span", { class: "placeholder" }, cell.type === "code" ? "Empty code cell" : "Raw cell"));
       v.input.append(pre);
     }
   }
@@ -844,6 +853,7 @@ export class NotebookView {
       ...this.ws.paneMenuItems(this),
       "-",
       { icon: "list", label: "Outline", onClick: () => this.outline() },
+      lineNumbersItem(),
       d.app.bridge.isAndroid ? null : { icon: "info", label: "Keyboard shortcuts", onClick: () => shortcutsPanel() },
       { icon: "folder", label: "Files", hint: "Data files for your code", onClick: () => openFilesPanel(d.kernel) },
       { icon: "package", label: "Offline packages", onClick: () => d.app.openPackages(d.kernel) },
@@ -910,7 +920,14 @@ export class NotebookView {
 
   // Called by the workspace for keys pressed while no editor or field has focus.
   onKey(e) {
-    if (this.editingId) return false;
+    if (this.editingId) {
+      // The cell is open but its editor lost focus (a menu was used): Esc still closes it.
+      if (e.key === "Escape") {
+        this._stopEditing();
+        return true;
+      }
+      return false;
+    }
     const mod = e.ctrlKey || e.metaKey;
     const d = this.doc;
     if (e.key === "Enter" && e.shiftKey && !mod) {
@@ -981,6 +998,10 @@ export class NotebookView {
           interruptOrRestart(d.kernel);
         } else this._lastI = Date.now();
         return true;
+      case "l":
+      case "L":
+        toggleLineNumbers();
+        return true;
       case "o":
         if (cell) {
           const v = this.cv.get(cell.id);
@@ -1044,6 +1065,7 @@ function shortcutsPanel() {
     ["D, D", "Delete the cell"],
     ["I, I", "Interrupt Python"],
     ["O", "Hide or show the cell's output"],
+    ["L", "Show or hide line numbers"],
     ["Ctrl+S", "Save"],
     ["Tab / Shift+Tab", "Indent or dedent while editing; Tab also completes"],
   ];

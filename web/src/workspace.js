@@ -56,7 +56,10 @@ export class Workspace {
     this._onKey = (e) => {
       if (e.defaultPrevented || hasLayer()) return;
       const a = document.activeElement;
-      const typing = a && a !== document.body && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(a.tagName) || (a.closest && a.closest(".cm-editor")));
+      // A focused button or link (left there by a click or a closed menu) only keeps the
+      // keys that press it; letter shortcuts still reach the notebook.
+      const pressKey = e.key === "Enter" || e.key === " " || e.key === "Tab";
+      const typing = a && a !== document.body && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || (/^(BUTTON|A)$/.test(a.tagName) && pressKey) || (a.closest && a.closest(".cm-editor")));
       if (typing) return;
       const v = this.active;
       if (v && v.onKey && v.onKey(e)) e.preventDefault();

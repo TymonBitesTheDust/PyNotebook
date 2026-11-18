@@ -618,7 +618,7 @@ class App {
         swatches),
       row("Code size", null, size),
       row("Wrap long lines", "Long code lines continue on the next line instead of scrolling sideways.", toggle(settings.wrap, (v) => saveSettings({ wrap: v }))),
-      row("Line numbers", "Shown while editing code.", toggle(settings.lineNumbers, (v) => saveSettings({ lineNumbers: v }))),
+      row("Line numbers", "Beside code in notebooks and .py files.", toggle(settings.lineNumbers, (v) => saveSettings({ lineNumbers: v }))),
       row("Suggestions while typing", "Type a few letters, like \u201cpr\u201d, to see names such as print. Tap one, or press Tab, to insert it.",
         toggle(settings.suggest !== false, (v) => saveSettings({ suggest: v }))),
       row("Mark mistakes while typing", "Underlines the line with a problem, such as a missing bracket or colon, or a name that isn\u2019t defined, and says what\u2019s wrong.",
