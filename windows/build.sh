@@ -10,7 +10,7 @@ HERE=$PWD
 ROOT=$(cd .. && pwd)
 TC=${TOOLCHAIN:-$HOME/toolchain}
 PYODIDE=${PYODIDE_DIR:-$HOME/vendor/pyodide/package}
-VERSION=${APP_VERSION:-1.5.0}
+VERSION=${APP_VERSION:-1.5.1}
 OUT=$ROOT/build-win
 PYODIDE_VERSION=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['version'])" "$PYODIDE/package.json")
 IFS=. read -r V1 V2 V3 <<< "$VERSION"
@@ -41,7 +41,7 @@ cat > versioninfo.json <<JSON
     "FileDescription": "PyNotebook - Jupyter notebooks and Python",
     "FileVersion": "$VERSION",
     "InternalName": "PyNotebook",
-    "LegalCopyright": "PyNotebook. Python by the PSF, Pyodide by the Pyodide project.",
+    "LegalCopyright": "\u00a9 2026 Tymon Ng. MIT licence. Includes Python (PSF) and Pyodide (MPL-2.0).",
     "OriginalFilename": "PyNotebook.exe",
     "ProductName": "PyNotebook",
     "ProductVersion": "$VERSION"

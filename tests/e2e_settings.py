@@ -43,7 +43,7 @@ try:
                      "Proudly made in Australia", "Website", "tymon.website", "Source code",
                      "github.com/TymonBitesTheDust/PyNotebook", "© 2026 Tymon Ng"]:
             check(text in about.replace("\n", "").replace("/​", "/") or text in about, f"About shows “{text}”", about)
-        hrefs = page.eval_on_selector_all(".about-link", "as => as.map(a => a.href)")
+        hrefs = page.eval_on_selector_all("a.about-link", "as => as.map(a => a.href)")
         check(hrefs == ["https://tymon.website/", "https://github.com/TymonBitesTheDust/PyNotebook"], "About links point to the website and repo", hrefs)
         with ctx.expect_page() as popup:
             page.click(".about-link:has-text('tymon.website')")

@@ -10,13 +10,14 @@ import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
+import { makeNotices } from "./licences.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const src = path.join(here, "src");
 const dist = path.join(here, "dist");
 const vendor = path.join(src, "vendor");
 const PYODIDE = process.env.PYODIDE_DIR || path.join(os.homedir(), "vendor", "pyodide", "package");
-const APP_VERSION = process.env.APP_VERSION || "1.5.0";
+const APP_VERSION = process.env.APP_VERSION || "1.5.1";
 const single = process.argv.includes("--single");
 const pyodideVersion = JSON.parse(fs.readFileSync(path.join(PYODIDE, "package.json"), "utf8")).version;
 
@@ -45,14 +46,20 @@ const common = {
 
 // ------------------------------------------------------------------ dist/ (served build)
 
-await build({
+const appBuild = await build({
   ...common,
   entryPoints: { app: path.join(src, "main.js") },
   format: "esm",
   outdir: dist,
   loader: { ".woff2": "file", ".woff": "file", ".ttf": "file" },
   assetNames: "assets/[name]-[hash]",
+  metafile: true,
 });
+
+// Open-source notices: shown in Settings > About, and kept in the repository.
+const notices = makeNotices({ metafile: appBuild.metafile, webDir: here, repoDir: path.join(here, ".."), pyodideDir: PYODIDE });
+fs.writeFileSync(path.join(dist, "licenses.json"), JSON.stringify(notices.json));
+fs.writeFileSync(path.join(here, "..", "THIRD_PARTY_NOTICES.txt"), notices.text);
 
 fs.copyFileSync(path.join(src, "index.html"), path.join(dist, "index.html"));
 fs.copyFileSync(path.join(src, "worker.js"), path.join(dist, "worker.js"));
@@ -132,6 +139,7 @@ if (single) {
     ["worker.js", "gz64", gz64(Buffer.from(workerJs))],
     ["py-bundle.json", "gz64", gz64(Buffer.from(JSON.stringify(pyBundle)))],
     ["welcome.ipynb", "gz64", gz64(fs.readFileSync(path.join(src, "welcome.ipynb")))],
+    ["licenses.json", "gz64", gz64(Buffer.from(JSON.stringify(notices.json)))],
     ["pyodide-lock.json", "gz64", gz64(fs.readFileSync(path.join(PYODIDE, "pyodide-lock.json")))],
     ["pyodide.asm.wasm", "gz64", gz64(fs.readFileSync(path.join(PYODIDE, "pyodide.asm.wasm")))],
     // Already compressed, so stored as plain base64.

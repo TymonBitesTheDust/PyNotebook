@@ -1,0 +1,35 @@
+{
+  "_about": "Software in PyNotebook that doesn't come from npm. Texts are in this folder (tools/update_licences.py refreshes them). \"version\": \"pyodide\" or \"python\" is filled in at build time.",
+  "components": [
+    {
+      "name": "Pyodide",
+      "version": "pyodide",
+      "license": "MPL-2.0",
+      "url": "https://github.com/pyodide/pyodide",
+      "file": "pyodide.txt",
+      "note": "Python for WebAssembly. Its source code is available at https://github.com/pyodide/pyodide."
+    },
+    {
+      "name": "Python (CPython)",
+      "version": "python",
+      "license": "PSF-2.0",
+      "url": "https://www.python.org",
+      "file": "python.txt",
+      "note": "Includes the licences of the software incorporated in Python, such as expat, libffi, libmpdec, mimalloc and zlib."
+    },
+    { "name": "HACL* (hash functions in Python)", "license": "MIT", "url": "https://github.com/hacl-star/hacl-star", "file": "hacl.txt" },
+    { "name": "bzip2", "license": "bzip2-1.0.6", "url": "https://sourceware.org/bzip2/", "file": "bzip2.txt" },
+    { "name": "XZ Utils (liblzma)", "license": "0BSD", "url": "https://tukaani.org/xz/", "file": "xz.txt" },
+    { "name": "Zstandard", "license": "BSD-3-Clause", "url": "https://github.com/facebook/zstd", "file": "zstd.txt" },
+    { "name": "SQLite", "license": "Public domain", "url": "https://sqlite.org", "file": "sqlite.txt" },
+    { "name": "Emscripten runtime", "license": "MIT OR NCSA", "url": "https://emscripten.org", "file": "emscripten.txt" },
+    { "name": "musl libc (through Emscripten)", "license": "MIT", "url": "https://musl.libc.org", "file": "musl.txt" },
+    {
+      "name": "Go runtime and standard library",
+      "license": "BSD-3-Clause",
+      "url": "https://go.dev",
+      "file": "go.txt",
+      "note": "Windows app only."
+    }
+  ]
+}
